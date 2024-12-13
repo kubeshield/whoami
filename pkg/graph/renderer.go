@@ -19,6 +19,7 @@ package graph
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -27,11 +28,14 @@ import (
 	"kubeops.dev/ui-server/pkg/shared"
 
 	"github.com/pkg/errors"
+	kerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 	kmapi "kmodules.xyz/client-go/api/v1"
 	rsapi "kmodules.xyz/resource-metadata/apis/meta/v1alpha1"
 	sharedapi "kmodules.xyz/resource-metadata/apis/shared"
@@ -39,6 +43,7 @@ import (
 	"kmodules.xyz/resource-metadata/pkg/tableconvertor"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+	chartsapi "x-helm.dev/apimachinery/apis/charts/v1alpha1"
 )
 
 func RenderLayout(
@@ -131,10 +136,26 @@ func RenderLayout(
 		}
 	}
 
+	var kubedbPreset chartsapi.ClusterChartPreset
+	err = kc.Get(context.TODO(), types.NamespacedName{Name: "kubedb-ui-presets"}, &kubedbPreset)
+	if err != nil && !kerr.IsNotFound(err) {
+		return nil, err
+	}
+	toShow, err := processValues(&kubedbPreset)
+	if err != nil {
+		return nil, err
+	}
+
 	out.Pages = make([]rsapi.ResourcePageView, 0, len(layout.Spec.Pages))
 
 	for _, pageLayout := range layout.Spec.Pages {
 		if pageName != "" && pageLayout.Name != pageName {
+			continue
+		}
+
+		v, exists := toShow[pageLayout.Name]
+		klog.Infof("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ %v %v \n", v, exists)
+		if exists && !v.(bool) {
 			continue
 		}
 
@@ -183,6 +204,28 @@ func RenderLayout(
 	}
 
 	return &out, nil
+}
+
+func processValues(kubedbPreset *chartsapi.ClusterChartPreset) (map[string]interface{}, error) {
+	mp := make(map[string]interface{})
+	if kubedbPreset == nil {
+		return mp, nil
+	}
+	values := kubedbPreset.Spec.Values
+	var dynamicMap map[string]interface{}
+	if err := json.Unmarshal(values.Raw, &dynamicMap); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal values: %w", err)
+	}
+	leftPanel := dynamicMap["spec"].(map[string]interface{})["admin"].(map[string]interface{})["leftPanel"].(map[string]interface{})
+	mp["Backup"] = leftPanel["showBackup"]
+	mp["Backup (Legacy)"] = leftPanel["showBackupLegacy"]
+	mp["Insights"] = leftPanel["showInsights"]
+	mp["Operations"] = leftPanel["showOperations"]
+	mp["Security"] = leftPanel["showSecurity"]
+	mp["Users"] = leftPanel["showVaultInfo"]
+
+	fmt.Printf("********************************************************************************************************************************************: %v \n", mp)
+	return mp, nil
 }
 
 func okToRender(kind rsapi.TableKind, renderBlocks sets.Set[string]) bool {

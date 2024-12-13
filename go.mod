@@ -23,8 +23,8 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/zeebo/xxh3 v1.0.2
-	go.bytebuilders.dev/catalog v0.0.11-0.20241125004308-e689253557ef
-	go.bytebuilders.dev/catalog-manager v0.1.1
+	go.bytebuilders.dev/catalog v0.0.11
+	go.bytebuilders.dev/catalog-manager v0.1.1-0.20241209051845-4beca2bc9663
 	go.bytebuilders.dev/license-verifier v0.14.3
 	go.openviz.dev/apimachinery v0.0.7
 	golang.org/x/sync v0.8.0
@@ -257,7 +257,7 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.17.1 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	voyagermesh.dev/gateway-api v0.0.2-0.20241124132233-ced3a99a7eae // indirect
-	voyagermesh.dev/installer v0.0.0-20241102060616-ff1e91bfcef8 // indirect
+	voyagermesh.dev/installer v0.0.0-20241127160952-d7800071f7ce // indirect
 
 )
 
