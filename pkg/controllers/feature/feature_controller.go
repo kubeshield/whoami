@@ -19,6 +19,8 @@ package feature
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog/v2"
+	"strings"
 
 	fluxhelm "github.com/fluxcd/helm-controller/api/v2"
 	"github.com/go-logr/logr"
@@ -286,17 +288,40 @@ func (r *frReconciler) isFeatureEnabled(ctx context.Context, status featureStatu
 }
 
 func (r *frReconciler) isFeatureReady(status featureStatus) (bool, string) {
-	if status.dependency != nil && !status.dependency.found {
+	r.printFeature(status)
+	if status.resources != nil && (!status.resources.found || !status.resources.ready) {
+		return false, status.resources.reason
+	}
+	if status.dependency != nil && (!status.dependency.found || !status.dependency.ready) {
 		return false, status.dependency.reason
 	}
-	if status.workload != nil && !status.workload.found {
+	if status.workload != nil && (!status.workload.found || !status.workload.ready) {
 		return false, status.workload.reason
 	}
-
 	if status.release != nil && status.release.found && !status.release.ready {
 		return false, "Respective HelmRelease is not ready"
 	}
 	return true, ""
+}
+
+func (r *frReconciler) printFeature(status featureStatus) {
+	if !strings.Contains(r.feature.Name, "kubedb") {
+		return
+	}
+	s := fmt.Sprintf("%v --------------------->", r.feature.Name)
+	if status.resources != nil {
+		s += fmt.Sprintf("Resources: f=%v r=%v n=%v", status.resources.found, status.resources.ready, status.resources.reason)
+	}
+	if status.dependency != nil {
+		s += fmt.Sprintf("Dependencies: f=%v r=%v n=%v", status.dependency.found, status.dependency.ready, status.dependency.reason)
+	}
+	if status.workload != nil {
+		s += fmt.Sprintf("Workload: f=%v r=%v n=%v", status.workload.found, status.workload.ready, status.workload.reason)
+	}
+	if status.release != nil {
+		s += fmt.Sprintf("Release: f=%v r=%v n=%v", status.release.found, status.release.ready, status.release.reason)
+	}
+	klog.Infof("%v", s)
 }
 
 func (r *frReconciler) checkDependencyExistence(ctx context.Context) (*requirementStatus, error) {
